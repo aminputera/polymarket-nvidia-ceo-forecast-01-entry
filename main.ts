@@ -66,10 +66,11 @@ function forecastMarket(market: Market, horizon: number): number[][] {
   const prices = market.prices;
   const current = prices[prices.length - 1] as number;
   const sigma = recentSigma(prices);
-  const rows: number[][] = [];
+  const rows = new Array<number[]>(horizon);
 
   for (let h = 1; h <= horizon; h++) {
-    const gaussian = NORMAL_Z.map((z) => clampPrice(current + z * sigma * Math.sqrt(h)));
+    const rootH = Math.sqrt(h);
+    const gaussian = NORMAL_Z.map((z) => clampPrice(current + z * sigma * rootH));
     const sampleStart = Math.max(h, prices.length - EMPIRICAL_WINDOW);
     const changes: number[] = [];
     for (let i = sampleStart; i < prices.length; i++) {
@@ -77,17 +78,15 @@ function forecastMarket(market: Market, horizon: number): number[][] {
     }
 
     if (changes.length < 30) {
-      rows.push(gaussian.map(price6));
+      rows[h - 1] = gaussian.map(price6);
       continue;
     }
 
     changes.sort((a, b) => a - b);
-    rows.push(
-      QUANTILES.map((level, index) => {
-        const empirical = clampPrice(current + quantile(changes, level));
-        return price6((1 - EMPIRICAL_WEIGHT) * (gaussian[index] as number) + EMPIRICAL_WEIGHT * empirical);
-      }),
-    );
+    rows[h - 1] = QUANTILES.map((level, index) => {
+      const empirical = clampPrice(current + quantile(changes, level));
+      return price6((1 - EMPIRICAL_WEIGHT) * (gaussian[index] as number) + EMPIRICAL_WEIGHT * empirical);
+    });
   }
   return rows;
 }
